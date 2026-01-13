@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech & Text Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: none;
+            margin-bottom: 20px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        button:disabled {
+            background: #ccc !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary.recording {
+            background: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .btn-secondary {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-clear {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-clear:hover:not(:disabled) {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 15px;
+            color: #667eea;
+            font-weight: 500;
+            min-height: 24px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .footer .heart {
+            color: #ef4444;
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            25% { transform: scale(1.1); }
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Speech & Text Converter</h1>
+        
+        <div class="mode-toggle">
+            <button class="mode-btn active" id="speechToTextBtn">
+                🎤 Speech to Text
+            </button>
+            <button class="mode-btn" id="textToSpeechBtn">
+                🔊 Text to Speech
+            </button>
+        </div>
+
+        <textarea id="textArea" placeholder="Your speech will appear here..."></textarea>
+
+        <div class="controls">
+            <button class="btn-primary" id="actionBtn">
+                <span id="actionIcon">🎤</span>
+                <span id="actionText">Start Listening</span>
+            </button>
+            <button class="btn-secondary" id="copyBtn" disabled>
+                <span>📋</span>
+                <span id="copyText">Copy</span>
+            </button>
+            <button class="btn-clear" id="clearBtn" disabled>
+                <span>🗑️</span>
+                <span>Clear</span>
+            </button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="footer">
+            Made with <span class="heart">❤️</span> by Akshan | January 2026
+        </div>
+    </div>
+
+
+    <script>
+        let mode = 'speech-to-text';
+        let recognition = null;
+        let isSpeaking = false;
+        let isListening = false;
+
+        const textArea = document.getElementById('textArea');
+        const actionBtn = document.getElementById('actionBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const status = document.getElementById('status');
+        const actionIcon = document.getElementById('actionIcon');
+        const actionText = document.getElementById('actionText');
+        const copyText = document.getElementById('copyText');
+        const speechToTextBtn = document.getElementById('speechToTextBtn');
+        const textToSpeechBtn = document.getElementById('textToSpeechBtn');
+
+        // Initialize Speech Recognition
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                textArea.value = transcript;
+                updateButtons();
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                actionBtn.classList.remove('recording');
+                actionIcon.textContent = '🎤';
+                actionText.textContent = 'Start Listening';
+                status.textContent = '';
+            };
+        }
+
+        // Mode Toggle
+        speechToTextBtn.addEventListener('click', () => {
+            mode = 'speech-to-text';
+            speechToTextBtn.classList.add('active');
+            textToSpeechBtn.classList.remove('active');
+            textArea.placeholder = 'Your speech will appear here...';
+            textArea.readOnly = true;
+            updateActionButton();
+        });
+
+        textToSpeechBtn.addEventListener('click', () => {
+            mode = 'text-to-speech';
+            textToSpeechBtn.classList.add('active');
+            speechToTextBtn.classList.remove('active');
+            textArea.placeholder = 'Enter text to speak...';
+            textArea.readOnly = false;
+            updateActionButton();
+        });
+
+        // Action Button (Listen or Speak)
+        actionBtn.addEventListener('click', () => {
+            if (mode === 'speech-to-text') {
+                toggleListening();
+            } else {
+                toggleSpeaking();
+            }
+        });
+
+        function toggleListening() {
+            if (!recognition) {
+                alert('Speech recognition is not supported in your browser.');
+                return;
+            }
+
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+            } else {
+                textArea.value = '';
+                recognition.start();
+                isListening = true;
+                actionBtn.classList.add('recording');
+                actionIcon.textContent = '⏹️';
+                actionText.textContent = 'Stop Listening';
+                status.textContent = '🎤 Listening... Speak now';
+            }
+        }
+
+        function toggleSpeaking() {
+            if (!textArea.value.trim()) {
+                alert('Please enter some text to speak.');
+                return;
+            }
+
+            if ('speechSynthesis' in window) {
+                if (isSpeaking) {
+                    window.speechSynthesis.cancel();
+                    isSpeaking = false;
+                    actionIcon.textContent = '🔊';
+                    actionText.textContent = 'Speak Text';
+                    status.textContent = '';
+                } else {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(textArea.value);
+                    
+                    utterance.onstart = () => {
+                        isSpeaking = true;
+                        actionIcon.textContent = '⏹️';
+                        actionText.textContent = 'Stop Speaking';
+                        status.textContent = '🔊 Speaking...';
+                    };
+
+                    utterance.onend = () => {
+                        isSpeaking = false;
+                        actionIcon.textContent = '🔊';
+                        actionText.textContent = 'Speak Text';
+                        status.textContent = '';
+                    };
+
+                    utterance.onerror = () => {
+                        isSpeaking = false;
+                        actionIcon.textContent = '🔊';
+                        actionText.textContent = 'Speak Text';
+                        status.textContent = '';
+                    };
+
+                    window.speechSynthesis.speak(utterance);
+                }
+            } else {
+                alert('Text-to-speech is not supported in your browser.');
+            }
+        }
+
+        // Copy Button
+        copyBtn.addEventListener('click', async () => {
+            if (!textArea.value.trim()) {
+                alert('Nothing to copy!');
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(textArea.value);
+                copyText.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyText.textContent = 'Copy';
+                }, 2000);
+            } catch (err) {
+                alert('Failed to copy to clipboard');
+            }
+        });
+
+        // Clear Button
+        clearBtn.addEventListener('click', () => {
+            textArea.value = '';
+            copyText.textContent = 'Copy';
+            updateButtons();
+        });
+
+        // Update buttons state
+        textArea.addEventListener('input', updateButtons);
+
+        function updateButtons() {
+            const hasText = textArea.value.trim().length > 0;
+            copyBtn.disabled = !hasText;
+            clearBtn.disabled = !hasText;
+            
+            if (mode === 'text-to-speech') {
+                actionBtn.disabled = !hasText && !isSpeaking;
+            }
+        }
+
+        function updateActionButton() {
+            if (mode === 'speech-to-text') {
+                actionIcon.textContent = '🎤';
+                actionText.textContent = 'Start Listening';
+                actionBtn.disabled = false;
+            } else {
+                actionIcon.textContent = '🔊';
+                actionText.textContent = 'Speak Text';
+                actionBtn.disabled = !textArea.value.trim();
+            }
+            status.textContent = '';
+        }
+
+        // Initialize
+        updateButtons();
+    </script>
+</body>
+</html>
